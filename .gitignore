@@ -3,3 +3,4 @@ vendor/
 token.json
 credentials.json
 db_list.csv
+file.log

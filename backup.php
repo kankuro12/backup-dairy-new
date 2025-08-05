@@ -2,7 +2,10 @@
 require_once 'ftp_helper.php';
 require_once 'env_loader.php';
 $env = loadEnv(__DIR__. '/.env');
-
+$logFile = __DIR__ ."/file.log";
+if (!file_exists($logFile)) {
+    file_put_contents($logFile, "Backup Log\n");
+}
 $zipFileDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps';
 if (!is_dir($zipFileDir)) {
     mkdir($zipFileDir, 0777, true);
@@ -89,6 +92,8 @@ if (!empty($zipFiles)) {
     try {
         uploadMultipleToFTP($zipFiles);
         echo "✓ Successfully uploaded all zip files via FTP\n";
+        // Log the successful upload
+        file_put_contents($logFile, date('Y-m-d H:i:s') . " - Successfully uploaded " . count($zipFiles) . " zip files.\n", FILE_APPEND);
         foreach ($zipFiles as $zipFile) {
             unlink($zipFile); // Clean up zip files after upload
         }
