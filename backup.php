@@ -1,18 +1,29 @@
 <?php
 require 'vendor/autoload.php';
+require_once 'ftp_helper.php';
+require_once 'env_loader.php';
+$env = loadEnv(__DIR__. '/.env');
+
+$zipFileDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps';
+if (!is_dir($zipFileDir)) {
+    mkdir($zipFileDir, 0777, true);
+}
 $csvFile = 'db_list.csv';
+$dateStr = date('Y_m_d');
+$dumpDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps' . DIRECTORY_SEPARATOR . $dateStr;
+if (!is_dir($dumpDir)) {
+    mkdir($dumpDir, 0777, true);
+}
+
+
+$zipFile = __DIR__ . DIRECTORY_SEPARATOR . 'dumps' . DIRECTORY_SEPARATOR . "{$dateStr}.zip";
+$dumpFiles = []; // Array to store all dump file paths
 
 if (($handle = fopen($csvFile, "r")) !== FALSE) {
     $header = fgetcsv($handle); // skip header
     while (($data = fgetcsv($handle)) !== FALSE) {
         list($dbname, $user, $password) = $data;
-        $dumpDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps';
-        if (!is_dir($dumpDir)) {
-            mkdir($dumpDir, 0777, true);
-        }
-        $dateStr = date('Y_m_d');
-        $dumpFile = $dumpDir . DIRECTORY_SEPARATOR . "{$dbname}_{$dateStr}.sql";
-        $zipFile = $dumpDir . DIRECTORY_SEPARATOR . "{$dbname}_{$dateStr}.zip";
+        $dumpFile = $dumpDir . DIRECTORY_SEPARATOR . "{$dbname}.sql";
 
         // Dump database
         if (!empty($password)) {
@@ -20,37 +31,71 @@ if (($handle = fopen($csvFile, "r")) !== FALSE) {
         } else {
             $cmd = "mysqldump -u{$user} {$dbname} > \"{$dumpFile}\"";
         }
+
+        echo "Dumping database: $dbname\n";
         system($cmd, $retval);
         if ($retval !== 0) {
             echo "Failed to dump database: $dbname\n";
             continue;
         }
 
-        // Zip the dump
-        $zip = new ZipArchive();
-        if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
-            $zip->addFile($dumpFile, basename($dumpFile));
-            $zip->close();
-        } else {
-            echo "Failed to create zip for: $dumpFile\n";
-            continue;
-        }
-
-        // Upload to Google Drive
-        require_once 'google_drive_helper.php';
-        try {
-            $fileId = uploadToGoogleDrive($zipFile, 'application/zip');
-            echo "Uploaded $zipFile as archive to Google Drive. File ID: $fileId\n";
-        } catch (Exception $e) {
-            echo "Google Drive upload error: " . $e->getMessage() . "\n";
-        }
-
-        // Clean up
-        unlink($dumpFile);
-        unlink($zipFile);
+        // Add successful dump to array
+        $dumpFiles[] = $dumpFile;
+        echo "Successfully dumped: $dbname\n";
     }
     fclose($handle);
+
+    // Create single zip file with all dumps
+    if (!empty($dumpFiles)) {
+        echo "Creating password-protected zip file with " . count($dumpFiles) . " database dumps...\n";
+        
+        // Generate or use a fixed password for zip file
+        $zipPassword = $env['ZIP_PASSWORD'] ?? 'default_password';
+        echo "Zip password: $zipPassword\n";
+        
+        $zip = new ZipArchive();
+        if ($zip->open($zipFile, ZipArchive::CREATE) === TRUE) {
+            // Set password for the entire archive
+            $zip->setPassword($zipPassword);
+            
+            foreach ($dumpFiles as $dumpFile) {
+                $zip->addFile($dumpFile, basename($dumpFile));
+                // Encrypt each file individually
+                $zip->setEncryptionName(basename($dumpFile), ZipArchive::EM_AES_256);
+            }
+            $zip->close();
+            echo "Password-protected zip file created: $zipFile\n";
+            
+            foreach ($dumpFiles as $dumpFile) {
+                unlink($dumpFile);
+            }
+            rmdir($dumpDir); // Remove the dump directory
+            echo "Cleanup completed.\n";
+        } else {
+            echo "Failed to create zip file: $zipFile\n";
+        }
+    } else {
+        echo "No databases were successfully dumped.\n";
+    }
 } else {
-    echo "Could not open CSV file.\n";
+    echo "Could not open CSV file. Checking for existing zip files...\n";
+    // Read all existing zip files and upload them using shared connection
 }
-?>
+
+$zipFiles = glob($zipFileDir . DIRECTORY_SEPARATOR . '*.zip');
+
+if (!empty($zipFiles)) {
+    echo "Found " . count($zipFiles) . " zip files to upload\n";
+    
+    try {
+        uploadMultipleToFTP($zipFiles);
+        echo "✓ Successfully uploaded all zip files via FTP\n";
+        foreach ($zipFiles as $zipFile) {
+            unlink($zipFile); // Clean up zip files after upload
+        }
+    } catch (Exception $e) {
+        echo "✗ Failed to upload files via FTP: " . $e->getMessage() . "\n";
+    }   
+} else {
+    echo "No zip files found to upload\n";
+}
