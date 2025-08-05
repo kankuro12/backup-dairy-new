@@ -15,7 +15,7 @@ if (!is_dir($dumpDir)) {
 }
 
 
-$zipFile = __DIR__ . DIRECTORY_SEPARATOR . 'dumps' . DIRECTORY_SEPARATOR . "{$dateStr}.zip";
+$zipFile = __DIR__ . DIRECTORY_SEPARATOR . 'dumps' . DIRECTORY_SEPARATOR . "{$env['ZIP_PREFIX']}{$dateStr}.zip";
 $dumpFiles = []; // Array to store all dump file paths
 
 if (($handle = fopen($csvFile, "r")) !== FALSE) {
