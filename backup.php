@@ -1,5 +1,4 @@
 <?php
-require 'vendor/autoload.php';
 require_once 'ftp_helper.php';
 require_once 'env_loader.php';
 $env = loadEnv(__DIR__. '/.env');
