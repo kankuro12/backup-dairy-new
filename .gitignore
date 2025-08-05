@@ -2,3 +2,4 @@ vendor/
 .env
 token.json
 credentials.json
+db_list.csv
