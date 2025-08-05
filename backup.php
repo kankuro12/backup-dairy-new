@@ -98,6 +98,8 @@ if (!empty($zipFiles)) {
             unlink($zipFile); // Clean up zip files after upload
         }
     } catch (Exception $e) {
+        // Log the error
+        file_put_contents($logFile, date('Y-m-d H:i:s') . " - Failed to upload files: " . $e->getMessage() . "\n", FILE_APPEND);
         echo "✗ Failed to upload files via FTP: " . $e->getMessage() . "\n";
     }   
 } else {
