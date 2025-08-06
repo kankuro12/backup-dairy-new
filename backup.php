@@ -10,7 +10,7 @@ $zipFileDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps';
 if (!is_dir($zipFileDir)) {
     mkdir($zipFileDir, 0777, true);
 }
-$csvFile = 'db_list.csv';
+$csvFile = __DIR__ . DIRECTORY_SEPARATOR . 'db_list.csv';
 $dateStr = date('Y_m_d');
 $dumpDir = __DIR__ . DIRECTORY_SEPARATOR . 'dumps' . DIRECTORY_SEPARATOR . $dateStr;
 if (!is_dir($dumpDir)) {
